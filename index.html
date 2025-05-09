@@ -3,125 +3,281 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fox Hunt</title>
+    <title>Fox Hunt Deluxe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-color: #f0f4f8; /* Light, cool gray-blue */
+            --primary-text-color: #2c3e50; /* Dark grayish blue */
+            --secondary-text-color: #576c7f;
+            --accent-color: #3498db; /* Vibrant blue */
+            --accent-hover-color: #2980b9;
+            --grid-bg: #ffffff;
+            --grid-border-color: #dce4ec;
+            --cell-hover-bg: #e9f2fa;
+            --probed-cell-bg: #a9d1f7; /* Softer blue for probed */
+            --probed-cell-text: #1a5276;
+            --found-cell-bg: #a3e4d7;  /* Softer green for found */
+            --found-cell-text: #0e6251;
+            --cell-mark-color: var(--accent-color);
+            --shadow-color: rgba(44, 62, 80, 0.15);
+            --border-radius: 8px;
+            --font-family: 'Nunito', sans-serif;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: var(--font-family);
+            display: flex;
+            justify-content: center; /* Center game-container */
+            align-items: flex-start; /* Align to top */
+            min-height: 100vh;
+            margin: 0;
+            padding-top: 30px; /* Add some space at the top */
+            padding-bottom: 30px;
+            background-color: var(--bg-color);
+            color: var(--primary-text-color);
+            overflow-x: hidden; /* Prevent horizontal scroll on small screens if container gets too wide */
+        }
+
+        .game-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin-top: 20px;
-            background-color: #f0f0f0;
-            color: #333;
+            background-color: #fff;
+            padding: 25px 30px;
+            border-radius: var(--border-radius) * 1.5;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            max-width: 90%; /* Ensure it doesn't get too wide on large screens */
+            width: fit-content; /* Adjust to content size */
         }
 
         h1 {
-            color: #333;
-        }
-
-        #game-info {
-            margin-bottom: 15px;
-            font-size: 1.1em;
-            min-height: 80px; /* Adjusted for more text */
+            color: var(--primary-text-color);
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            font-weight: 700;
             text-align: center;
         }
 
+        #game-info-panel {
+            background-color: #f8f9fa; /* Slightly different background for the panel */
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 25px;
+            width: 100%;
+            max-width: 500px; /* Max width for info panel */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        
+        #game-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 10px;
+        }
+
+        #game-stats p {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin: 5px 0;
+        }
+        
+        #status-text {
+             color: var(--accent-color);
+        }
+
+        #probes-text {
+            color: var(--secondary-text-color);
+        }
+
+        #instructions-text {
+            font-size: 0.9em;
+            color: var(--secondary-text-color);
+            line-height: 1.5;
+        }
+
+
         #game-grid {
-            border-collapse: collapse;
-            border: 2px solid #333;
-            margin-bottom: 20px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
-            user-select: none; /* Prevent text selection on clicks */
+            border-collapse: separate; /* Needed for border-radius on cells */
+            border-spacing: 2px; /* Spacing between cells */
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px var(--shadow-color);
+            border-radius: var(--border-radius);
+            background-color: var(--grid-border-color); /* This will be the "border" */
+            user-select: none;
         }
 
         #game-grid td {
-            width: 40px;
-            height: 40px;
-            border: 1px solid #ccc;
+            width: 42px;
+            height: 42px;
+            border: none; /* Using border-spacing and background for separation */
             text-align: center;
             vertical-align: middle;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
-            background-color: #fff;
-            transition: background-color 0.3s, color 0.3s;
-            position: relative; /* For positioning marks */
+            background-color: var(--grid-bg);
+            transition: background-color 0.2s ease-out, transform 0.1s ease-out, box-shadow 0.2s ease-out;
+            position: relative;
+            border-radius: 4px; /* Rounded corners for individual cells */
         }
 
-        #game-grid td:hover {
-            background-color: #e0e0e0;
+        #game-grid td:hover:not(.probed):not(.found) {
+            background-color: var(--cell-hover-bg);
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            z-index: 1; /* Bring hovered cell to front */
         }
 
         #game-grid td .game-content {
-            display: inline-block;
-            font-size: 1.2em;
+            display: flex; /* For centering icon/number */
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            font-size: 1.3em;
+            transition: opacity 0.3s ease-in-out;
+            opacity: 0; /* Start hidden, will be shown via JS or class */
         }
         
+        #game-grid td.revealed .game-content { /* Add 'revealed' class when content is set */
+            opacity: 1;
+        }
+
         #game-grid td .cell-mark {
             position: absolute;
-            top: 1px;
-            right: 3px;
-            font-size: 0.6em;
-            color: #007bff; /* Blue for marks */
-            pointer-events: none; /* Marks should not interfere with cell clicks */
+            top: 2px;
+            right: 4px;
+            font-size: 0.7em;
+            font-weight: 700;
+            color: var(--cell-mark-color);
+            pointer-events: none;
+            background-color: rgba(255,255,255,0.7);
+            padding: 0 2px;
+            border-radius: 3px;
         }
 
         #game-grid td.probed {
-            background-color: #a7c7e7; /* Light blue */
+            background-color: var(--probed-cell-bg);
             cursor: default;
         }
         #game-grid td.probed .game-content {
-             color: #000;
+             color: var(--probed-cell-text);
         }
 
         #game-grid td.found {
-            background-color: #90ee90; /* Light green */
+            background-color: var(--found-cell-bg);
             cursor: default;
+            animation: foundAnimation 0.5s ease-out;
         }
         #game-grid td.found .game-content {
-            font-size: 1.5em; /* Make fox emoji bigger */
+            font-size: 1.8em; /* Make fox emoji bigger */
+            color: var(--found-cell-text);
+            animation: foxPop 0.3s 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        
+        @keyframes foundAnimation {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        @keyframes foxPop {
+            0% { transform: scale(0.5); opacity: 0;}
+            100% { transform: scale(1); opacity: 1;}
         }
 
+
         #reset-button {
-            padding: 10px 20px;
-            font-size: 1em;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            font-weight: 600;
             color: white;
-            background-color: #007bff;
+            background-color: var(--accent-color);
             border: none;
-            border-radius: 5px;
+            border-radius: var(--border-radius);
             cursor: pointer;
-            transition: background-color 0.3s;
+            transition: background-color 0.2s ease-out, transform 0.1s ease-out, box-shadow 0.2s ease-out;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
         }
 
         #reset-button:hover {
-            background-color: #0056b3;
+            background-color: var(--accent-hover-color);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.15);
         }
+        #reset-button:active {
+            transform: translateY(0px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .game-container {
+                padding: 15px;
+                margin-top: 15px;
+                margin-bottom: 15px;
+            }
+            h1 {
+                font-size: 2em;
+            }
+            #game-info-panel {
+                padding: 10px;
+            }
+            #game-stats {
+                flex-direction: column;
+                align-items: center;
+            }
+            #game-stats p {
+                font-size: 1em;
+            }
+            #game-grid td {
+                width: 35px;
+                height: 35px;
+            }
+            #game-grid td .game-content {
+                font-size: 1.1em;
+            }
+            #game-grid td.found .game-content {
+                 font-size: 1.5em;
+            }
+            #reset-button {
+                padding: 10px 20px;
+                font-size: 1em;
+            }
+        }
+
     </style>
 </head>
 <body>
-    <h1>Fox Hunt</h1>
+    <!-- Added a wrapper for better centering and styling -->
+    <div class="game-container">
+        <h1>Fox Hunt Deluxe</h1>
 
-    <div id="game-info">
-        <p id="status-text">Loading game...</p>
-        <p id="probes-text">Probes: 0</p>
-        <p style="font-size: 0.9em;">
-            Find 8 foxes on a 10x10 grid. The number in a cell indicates total foxes (found or not) on its row, column, & diagonals. <br>
-            Left-click to probe. Right-click to mark a cell (0, 1, 2...), middle-click to clear mark.
-        </p>
+        <!-- Structured game info -->
+        <div id="game-info-panel">
+            <div id="game-stats">
+                <p id="status-text">Loading game...</p>
+                <p id="probes-text">Probes: 0</p>
+            </div>
+            <p id="instructions-text"> <!-- Renamed from simple p tag for clarity -->
+                Find 8 foxes on a 10x10 grid. The number in a cell indicates total foxes (found or not) on its row, column, & diagonals. <br>
+                Left-click to probe. Right-click to mark a cell (0, 1, 2...), middle-click to clear mark.
+            </p>
+        </div>
+
+        <table id="game-grid"></table>
+
+        <button id="reset-button">Start Over</button>
     </div>
-
-    <table id="game-grid"></table>
-
-    <button id="reset-button">Start Over</button>
 
     <script>
         const GRID_SIZE = 10;
         const NUM_FOXES = 8;
         const FOX_ICON = '🦊';
 
-        let foxes = []; // Array of {row, col, id, found: false}
+        let foxes = []; 
         let foundFoxesCount = 0;
-        let gridCellReferences = []; // 2D array of {td, gameContentSpan, markSpan}
-        let cellMarks = []; // 2D array for numerical marks (null if no mark, then 0, 1, 2...)
+        let gridCellReferences = [];
+        let cellMarks = []; 
         let gameIsOver = false;
         let probesMade = 0;
 
@@ -136,7 +292,6 @@
             gridCellReferences = [];
             cellMarks = []; 
             for (let r = 0; r < GRID_SIZE; r++) {
-                // UPDATED: Initialize with null for no mark
                 cellMarks[r] = Array(GRID_SIZE).fill(null); 
             }
             gameIsOver = false;
@@ -144,10 +299,8 @@
             gameGridElement.innerHTML = ''; 
 
             createGrid();
-            placeFoxes(); // This will now place foxes in unique cells
+            placeFoxes();
             updateStatusDisplay();
-            // For debugging:
-            // console.log("Foxes placed at:", foxes.map(f => `(${f.row},${f.col}) ID:${f.id}`).join('; '));
         }
 
         function createGrid() {
@@ -173,14 +326,13 @@
 
                     cellTd.addEventListener('click', () => handleCellClick(r, c, cellRef));
                     cellTd.addEventListener('contextmenu', (event) => handleRightClick(event, r, c, cellRef));
-                    cellTd.addEventListener('auxclick', (event) => handleMiddleClick(event, r, c, cellRef)); // Middle click
+                    cellTd.addEventListener('auxclick', (event) => handleMiddleClick(event, r, c, cellRef));
                 }
             }
         }
 
-        // UPDATED: Ensures foxes are placed in unique cells
         function placeFoxes() {
-            const occupiedCells = new Set(); // Stores "row,col" strings to track occupied cells
+            const occupiedCells = new Set(); 
 
             for (let i = 0; i < NUM_FOXES; i++) {
                 let row, col, cellKey;
@@ -188,12 +340,27 @@
                     row = Math.floor(Math.random() * GRID_SIZE);
                     col = Math.floor(Math.random() * GRID_SIZE);
                     cellKey = `${row},${col}`;
-                } while (occupiedCells.has(cellKey)); // Loop until an empty cell is found
+                } while (occupiedCells.has(cellKey)); 
 
                 foxes.push({ row, col, id: i, found: false });
                 occupiedCells.add(cellKey);
             }
         }
+
+        function setCellContent(cellRef, content, isFox = false) {
+            cellRef.gameContent.textContent = content;
+            // Add 'revealed' class to trigger opacity transition
+            // Ensure this happens after potential DOM updates, so use a tiny timeout
+            setTimeout(() => {
+                cellRef.td.classList.add('revealed');
+                if (isFox) {
+                    cellRef.td.classList.add('found'); // also applies found animation
+                } else if (content !== '') { // If it's a number or any probed content
+                    cellRef.td.classList.add('probed');
+                }
+            }, 0);
+        }
+
 
         function handleCellClick(row, col, cellRef) {
             if (gameIsOver || cellRef.td.classList.contains('probed') || cellRef.td.classList.contains('found')) {
@@ -202,7 +369,6 @@
 
             probesMade++; 
 
-            // Since foxes are in unique cells, directHits will be 0 or 1
             let directHit = false;
             foxes.forEach(fox => {
                 if (fox.row === row && fox.col === col && !fox.found) {
@@ -213,15 +379,18 @@
             });
 
             if (directHit) {
-                cellRef.gameContent.textContent = FOX_ICON; // Only one fox per cell possible now
-                cellRef.td.classList.add('found');
+                // cellRef.gameContent.textContent = FOX_ICON;
+                // cellRef.td.classList.add('found');
+                // cellRef.td.classList.add('revealed'); // For opacity transition
+                setCellContent(cellRef, FOX_ICON, true);
             } else {
                 const pelengCount = calculatePeleng(row, col);
-                cellRef.gameContent.textContent = pelengCount;
-                cellRef.td.classList.add('probed');
+                // cellRef.gameContent.textContent = pelengCount;
+                // cellRef.td.classList.add('probed');
+                // cellRef.td.classList.add('revealed'); // For opacity transition
+                setCellContent(cellRef, pelengCount);
             }
             
-            // Clear any user marks on probed/found cells
             if (cellMarks[row][col] !== null) {
                 cellMarks[row][col] = null;
                 cellRef.mark.textContent = '';
@@ -231,30 +400,28 @@
             checkWin();
         }
 
-        // UPDATED: Right-click to mark, starts with '0'
         function handleRightClick(event, row, col, cellRef) {
             event.preventDefault(); 
             if (gameIsOver || cellRef.td.classList.contains('probed') || cellRef.td.classList.contains('found')) {
-                return; // Don't mark probed or found cells
+                return; 
             }
 
             if (cellMarks[row][col] === null) {
-                cellMarks[row][col] = 0; // First mark is '0'
+                cellMarks[row][col] = 0; 
             } else {
-                cellMarks[row][col]++; // Increment existing mark
+                cellMarks[row][col]++; 
             }
             cellRef.mark.textContent = cellMarks[row][col];
         }
 
-        // UPDATED: Middle-click to clear mark
         function handleMiddleClick(event, row, col, cellRef) {
-            if (event.button === 1) { // Middle mouse button
+            if (event.button === 1) { 
                 event.preventDefault();
                 if (gameIsOver || cellRef.td.classList.contains('probed') || cellRef.td.classList.contains('found')) {
-                    return; // Don't unmark probed or found cells
+                    return; 
                 }
                 
-                cellMarks[row][col] = null; // Reset mark to null (no mark)
+                cellMarks[row][col] = null; 
                 cellRef.mark.textContent = ''; 
             }
         }
@@ -263,9 +430,6 @@
             const uniqueFoxIDsOnLines = new Set(); 
 
             foxes.forEach(fox => {
-                // The rule is that peleng counts all foxes (found or not)
-                // if (fox.found) return; // This line was correctly removed/commented in your provided code
-
                 const isOnRow = fox.row === probeRow;
                 const isOnCol = fox.col === probeCol;
                 const isOnDiagonal1 = (fox.row - fox.col) === (probeRow - probeCol);
@@ -281,7 +445,6 @@
         function updateStatusDisplay() {
             probesTextElement.textContent = `Probes: ${probesMade}`;
             if (gameIsOver) {
-                // Status text is set by checkWin when game ends
                 return;
             }
 
@@ -294,7 +457,7 @@
         function checkWin() {
             if (foundFoxesCount === NUM_FOXES && !gameIsOver) { 
                 gameIsOver = true;
-                statusTextElement.textContent = `Congratulations! All ${NUM_FOXES} foxes found in ${probesMade} probes!`;
+                statusTextElement.innerHTML = `🎉 All ${NUM_FOXES} foxes found in ${probesMade} probes! 🎉`; // Added emojis
                 revealAllFoxes(); 
             }
         }
@@ -307,19 +470,20 @@
                         continue; 
                     }
 
-                    // Since foxes are unique, at most one fox per cell
                     let foxInCell = false;
                     foxes.forEach(fox => { 
-                        if (fox.row === r && fox.col === c) { // No need to check !fox.found, reveal all
+                        if (fox.row === r && fox.col === c) { 
                             foxInCell = true;
                         }
                     });
 
                     if (foxInCell) { 
-                        cellRef.gameContent.textContent = FOX_ICON;
-                        cellRef.td.classList.add('found'); // Visually mark as found
-                        // Optional: different style for revealed-at-end-not-by-player
-                        cellRef.td.style.backgroundColor = "#ffdddd"; // Light red for revealed
+                        // cellRef.gameContent.textContent = FOX_ICON;
+                        // cellRef.td.classList.add('found'); 
+                        // cellRef.td.classList.add('revealed');
+                        setCellContent(cellRef, FOX_ICON, true);
+                        cellRef.td.style.backgroundColor = "#ffe0e0"; // Light red for revealed by game end
+                        cellRef.td.style.color = "#c0392b";
                     }
                 }
             }
