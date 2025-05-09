@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fox Hunt</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        #game-info {
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            min-height: 80px; /* Adjusted for more text */
+            text-align: center;
+        }
+
+        #game-grid {
+            border-collapse: collapse;
+            border: 2px solid #333;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            user-select: none; /* Prevent text selection on clicks */
+        }
+
+        #game-grid td {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #ccc;
+            text-align: center;
+            vertical-align: middle;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #fff;
+            transition: background-color 0.3s, color 0.3s;
+            position: relative; /* For positioning marks */
+        }
+
+        #game-grid td:hover {
+            background-color: #e0e0e0;
+        }
+
+        #game-grid td .game-content {
+            display: inline-block;
+            font-size: 1.2em;
+        }
+        
+        #game-grid td .cell-mark {
+            position: absolute;
+            top: 1px;
+            right: 3px;
+            font-size: 0.6em;
+            color: #007bff; /* Blue for marks */
+            pointer-events: none; /* Marks should not interfere with cell clicks */
+        }
+
+        #game-grid td.probed {
+            background-color: #a7c7e7; /* Light blue */
+            cursor: default;
+        }
+        #game-grid td.probed .game-content {
+             color: #000;
+        }
+
+        #game-grid td.found {
+            background-color: #90ee90; /* Light green */
+            cursor: default;
+        }
+        #game-grid td.found .game-content {
+            font-size: 1.5em; /* Make fox emoji bigger */
+        }
+
+        #reset-button {
+            padding: 10px 20px;
+            font-size: 1em;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #reset-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fox Hunt</h1>
+
+    <div id="game-info">
+        <p id="status-text">Loading game...</p>
+        <p id="probes-text">Probes: 0</p>
+        <p style="font-size: 0.9em;">
+            Find 8 foxes on a 10x10 grid. The number in a cell indicates how many foxes are in the same row, column, and diagonals. <br>
+            Left-click to probe. Right-click to mark a cell (increments), middle-click to clear mark.
+        </p>
+    </div>
+
+    <table id="game-grid"></table>
+
+    <button id="reset-button">Start Over</button>
+
+    <script>
+        const GRID_SIZE = 10;
+        const NUM_FOXES = 8;
+        const FOX_ICON = '🦊';
+
+        let foxes = []; // Array of {row, col, id, found: false}
+        let foundFoxesCount = 0;
+        let gridCellReferences = []; // 2D array of {td, gameContentSpan, markSpan}
+        let cellMarks = []; // 2D array for numerical marks (0 if no mark)
+        let gameIsOver = false;
+        let probesMade = 0;
+
+        const gameGridElement = document.getElementById('game-grid');
+        const statusTextElement = document.getElementById('status-text');
+        const probesTextElement = document.getElementById('probes-text');
+        const resetButtonElement = document.getElementById('reset-button');
+
+        function initGame() {
+            foxes = [];
+            foundFoxesCount = 0;
+            gridCellReferences = [];
+            cellMarks = []; // Initialize cellMarks
+            for (let r = 0; r < GRID_SIZE; r++) {
+                cellMarks[r] = Array(GRID_SIZE).fill(0);
+            }
+            gameIsOver = false;
+            probesMade = 0;
+            gameGridElement.innerHTML = ''; // Clear previous grid
+
+            createGrid();
+            placeFoxes();
+            updateStatusDisplay();
+            // For debugging:
+            // console.log("Foxes placed at:", foxes.map(f => `(${f.row},${f.col}) ID:${f.id}`).join('; '));
+        }
+
+        function createGrid() {
+            for (let r = 0; r < GRID_SIZE; r++) {
+                const rowElement = gameGridElement.insertRow();
+                gridCellReferences[r] = [];
+                // cellMarks[r] is already initialized in initGame
+
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cellTd = rowElement.insertCell();
+                    cellTd.dataset.row = r;
+                    cellTd.dataset.col = c;
+
+                    const gameContentSpan = document.createElement('span');
+                    gameContentSpan.classList.add('game-content');
+                    cellTd.appendChild(gameContentSpan);
+
+                    const markSpan = document.createElement('span');
+                    markSpan.classList.add('cell-mark');
+                    cellTd.appendChild(markSpan);
+                    
+                    const cellRef = { td: cellTd, gameContent: gameContentSpan, mark: markSpan };
+                    gridCellReferences[r][c] = cellRef;
+
+                    cellTd.addEventListener('click', () => handleCellClick(r, c, cellRef));
+                    cellTd.addEventListener('contextmenu', (event) => handleRightClick(event, r, c, cellRef));
+                    cellTd.addEventListener('auxclick', (event) => handleMiddleClick(event, r, c, cellRef));
+                }
+            }
+        }
+
+        function placeFoxes() {
+            for (let i = 0; i < NUM_FOXES; i++) {
+                const row = Math.floor(Math.random() * GRID_SIZE);
+                const col = Math.floor(Math.random() * GRID_SIZE);
+                foxes.push({ row, col, id: i, found: false });
+            }
+        }
+
+        function handleCellClick(row, col, cellRef) {
+            if (gameIsOver || cellRef.td.classList.contains('probed') || cellRef.td.classList.contains('found')) {
+                return; // Cell already processed or game over
+            }
+
+            probesMade++; // Count this valid probe/action click
+
+            let directHits = 0;
+            foxes.forEach(fox => {
+                if (fox.row === row && fox.col === col && !fox.found) {
+                    fox.found = true;
+                    foundFoxesCount++;
+                    directHits++;
+                }
+            });
+
+            if (directHits > 0) {
+                cellRef.gameContent.textContent = FOX_ICON.repeat(directHits);
+                cellRef.td.classList.add('found');
+            } else {
+                const pelengCount = calculatePeleng(row, col);
+                cellRef.gameContent.textContent = pelengCount;
+                cellRef.td.classList.add('probed');
+            }
+
+            updateStatusDisplay();
+            checkWin();
+        }
+
+        function handleRightClick(event, row, col, cellRef) {
+            event.preventDefault(); // Prevent browser context menu
+            if (gameIsOver) return;
+
+            // Allow marking even on probed/found cells.
+            // If you want to prevent marking on already revealed cells, uncomment below:
+            // if (cellRef.td.classList.contains('probed') || cellRef.td.classList.contains('found')) return;
+
+            cellMarks[row][col]++;
+            cellRef.mark.textContent = cellMarks[row][col];
+        }
+
+        function handleMiddleClick(event, row, col, cellRef) {
+            // event.button === 1 typically for middle mouse button
+            if (event.button === 1) { 
+                event.preventDefault();
+                if (gameIsOver) return;
+                
+                cellMarks[row][col] = 0;
+                cellRef.mark.textContent = ''; // Clear the mark display
+            }
+        }
+
+        function calculatePeleng(probeRow, probeCol) {
+            const uniqueFoxIDsOnLines = new Set(); 
+
+            foxes.forEach(fox => {
+                if (fox.found) return; // Don't count found foxes
+
+                const isOnRow = fox.row === probeRow;
+                const isOnCol = fox.col === probeCol;
+                // Diagonal 1: (y - x) is constant
+                const isOnDiagonal1 = (fox.row - fox.col) === (probeRow - probeCol);
+                // Diagonal 2: (y + x) is constant
+                const isOnDiagonal2 = (fox.row + fox.col) === (probeRow + probeCol);
+
+                if (isOnRow || isOnCol || isOnDiagonal1 || isOnDiagonal2) {
+                    uniqueFoxIDsOnLines.add(fox.id); // Add fox ID to count unique foxes
+                }
+            });
+            return uniqueFoxIDsOnLines.size;
+        }
+
+        function updateStatusDisplay() {
+            probesTextElement.textContent = `Probes: ${probesMade}`;
+            if (gameIsOver) {
+                // Win message is handled by checkWin to include final probe count
+                return;
+            }
+
+            const foxesRemaining = NUM_FOXES - foundFoxesCount;
+            if (foxesRemaining > 0) {
+                statusTextElement.textContent = `Foxes remaining: ${foxesRemaining}`;
+            } else {
+                 // This state (all foxes found but game not yet marked over)
+                 // should immediately trigger checkWin which sets the final message.
+            }
+        }
+
+        function checkWin() {
+            if (foundFoxesCount === NUM_FOXES && !gameIsOver) { // Ensure win condition only triggers once
+                gameIsOver = true;
+                statusTextElement.textContent = `Congratulations! All ${NUM_FOXES} foxes found in ${probesMade} probes!`;
+                // Optionally, reveal any unclicked cells that had foxes, for visual confirmation
+                revealAllFoxes(); 
+            }
+        }
+        
+        function revealAllFoxes() { // Optional: shows foxes in unclicked cells upon winning
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cellRef = gridCellReferences[r][c];
+                    // Skip if cell was already found or probed by the player
+                    if (cellRef.td.classList.contains('found') || cellRef.td.classList.contains('probed')) {
+                        continue; 
+                    }
+
+                    let foxesInCellCount = 0;
+                    foxes.forEach(fox => { // Check original fox placements
+                        if (fox.row === r && fox.col === c) {
+                            foxesInCellCount++;
+                        }
+                    });
+
+                    if (foxesInCellCount > 0) { // If this unclicked cell had a fox
+                        cellRef.gameContent.textContent = FOX_ICON.repeat(foxesInCellCount);
+                        cellRef.td.classList.add('found'); 
+                        // Slightly different background for auto-revealed foxes
+                        cellRef.td.style.backgroundColor = "#ffdddd"; 
+                    }
+                }
+            }
+        }
+
+        resetButtonElement.addEventListener('click', initGame);
+
+        // Start the game on load
+        document.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
