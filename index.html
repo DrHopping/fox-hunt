@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -104,7 +105,7 @@
         <p id="status-text">Loading game...</p>
         <p id="probes-text">Probes: 0</p>
         <p style="font-size: 0.9em;">
-            Find 8 foxes on a 10x10 grid. The number in a cell indicates how many foxes are in the same row, column, and diagonals. <br>
+            Find 8 foxes on a 10x10 grid. The number in a cell indicates total foxes (found or not) on its row, column, & diagonals. <br>
             Left-click to probe. Right-click to mark a cell (increments), middle-click to clear mark.
         </p>
     </div>
@@ -134,13 +135,13 @@
             foxes = [];
             foundFoxesCount = 0;
             gridCellReferences = [];
-            cellMarks = []; // Initialize cellMarks
+            cellMarks = []; 
             for (let r = 0; r < GRID_SIZE; r++) {
                 cellMarks[r] = Array(GRID_SIZE).fill(0);
             }
             gameIsOver = false;
             probesMade = 0;
-            gameGridElement.innerHTML = ''; // Clear previous grid
+            gameGridElement.innerHTML = ''; 
 
             createGrid();
             placeFoxes();
@@ -153,8 +154,7 @@
             for (let r = 0; r < GRID_SIZE; r++) {
                 const rowElement = gameGridElement.insertRow();
                 gridCellReferences[r] = [];
-                // cellMarks[r] is already initialized in initGame
-
+                
                 for (let c = 0; c < GRID_SIZE; c++) {
                     const cellTd = rowElement.insertCell();
                     cellTd.dataset.row = r;
@@ -188,10 +188,10 @@
 
         function handleCellClick(row, col, cellRef) {
             if (gameIsOver || cellRef.td.classList.contains('probed') || cellRef.td.classList.contains('found')) {
-                return; // Cell already processed or game over
+                return; 
             }
 
-            probesMade++; // Count this valid probe/action click
+            probesMade++; 
 
             let directHits = 0;
             foxes.forEach(fox => {
@@ -216,25 +216,20 @@
         }
 
         function handleRightClick(event, row, col, cellRef) {
-            event.preventDefault(); // Prevent browser context menu
+            event.preventDefault(); 
             if (gameIsOver) return;
-
-            // Allow marking even on probed/found cells.
-            // If you want to prevent marking on already revealed cells, uncomment below:
-            // if (cellRef.td.classList.contains('probed') || cellRef.td.classList.contains('found')) return;
 
             cellMarks[row][col]++;
             cellRef.mark.textContent = cellMarks[row][col];
         }
 
         function handleMiddleClick(event, row, col, cellRef) {
-            // event.button === 1 typically for middle mouse button
             if (event.button === 1) { 
                 event.preventDefault();
                 if (gameIsOver) return;
                 
                 cellMarks[row][col] = 0;
-                cellRef.mark.textContent = ''; // Clear the mark display
+                cellRef.mark.textContent = ''; 
             }
         }
 
@@ -242,17 +237,18 @@
             const uniqueFoxIDsOnLines = new Set(); 
 
             foxes.forEach(fox => {
-                if (fox.found) return; // Don't count found foxes
+                // **********************************************************************
+                // CHANGE HERE: The following line is REMOVED (or commented out)
+                // if (fox.found) return; // Previously, we skipped found foxes
+                // **********************************************************************
 
                 const isOnRow = fox.row === probeRow;
                 const isOnCol = fox.col === probeCol;
-                // Diagonal 1: (y - x) is constant
                 const isOnDiagonal1 = (fox.row - fox.col) === (probeRow - probeCol);
-                // Diagonal 2: (y + x) is constant
                 const isOnDiagonal2 = (fox.row + fox.col) === (probeRow + probeCol);
 
                 if (isOnRow || isOnCol || isOnDiagonal1 || isOnDiagonal2) {
-                    uniqueFoxIDsOnLines.add(fox.id); // Add fox ID to count unique foxes
+                    uniqueFoxIDsOnLines.add(fox.id); 
                 }
             });
             return uniqueFoxIDsOnLines.size;
@@ -261,48 +257,41 @@
         function updateStatusDisplay() {
             probesTextElement.textContent = `Probes: ${probesMade}`;
             if (gameIsOver) {
-                // Win message is handled by checkWin to include final probe count
                 return;
             }
 
             const foxesRemaining = NUM_FOXES - foundFoxesCount;
             if (foxesRemaining > 0) {
                 statusTextElement.textContent = `Foxes remaining: ${foxesRemaining}`;
-            } else {
-                 // This state (all foxes found but game not yet marked over)
-                 // should immediately trigger checkWin which sets the final message.
             }
         }
 
         function checkWin() {
-            if (foundFoxesCount === NUM_FOXES && !gameIsOver) { // Ensure win condition only triggers once
+            if (foundFoxesCount === NUM_FOXES && !gameIsOver) { 
                 gameIsOver = true;
                 statusTextElement.textContent = `Congratulations! All ${NUM_FOXES} foxes found in ${probesMade} probes!`;
-                // Optionally, reveal any unclicked cells that had foxes, for visual confirmation
                 revealAllFoxes(); 
             }
         }
         
-        function revealAllFoxes() { // Optional: shows foxes in unclicked cells upon winning
+        function revealAllFoxes() { 
             for (let r = 0; r < GRID_SIZE; r++) {
                 for (let c = 0; c < GRID_SIZE; c++) {
                     const cellRef = gridCellReferences[r][c];
-                    // Skip if cell was already found or probed by the player
                     if (cellRef.td.classList.contains('found') || cellRef.td.classList.contains('probed')) {
                         continue; 
                     }
 
                     let foxesInCellCount = 0;
-                    foxes.forEach(fox => { // Check original fox placements
+                    foxes.forEach(fox => { 
                         if (fox.row === r && fox.col === c) {
                             foxesInCellCount++;
                         }
                     });
 
-                    if (foxesInCellCount > 0) { // If this unclicked cell had a fox
+                    if (foxesInCellCount > 0) { 
                         cellRef.gameContent.textContent = FOX_ICON.repeat(foxesInCellCount);
                         cellRef.td.classList.add('found'); 
-                        // Slightly different background for auto-revealed foxes
                         cellRef.td.style.backgroundColor = "#ffdddd"; 
                     }
                 }
@@ -310,8 +299,6 @@
         }
 
         resetButtonElement.addEventListener('click', initGame);
-
-        // Start the game on load
         document.addEventListener('DOMContentLoaded', initGame);
     </script>
 </body>
