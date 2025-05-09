@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -106,7 +105,7 @@
         <p id="probes-text">Probes: 0</p>
         <p style="font-size: 0.9em;">
             Find 8 foxes on a 10x10 grid. The number in a cell indicates total foxes (found or not) on its row, column, & diagonals. <br>
-            Left-click to probe. Right-click to mark a cell (increments), middle-click to clear mark.
+            Left-click to probe. Right-click to mark a cell (0, 1, 2...), middle-click to clear mark.
         </p>
     </div>
 
@@ -122,7 +121,7 @@
         let foxes = []; // Array of {row, col, id, found: false}
         let foundFoxesCount = 0;
         let gridCellReferences = []; // 2D array of {td, gameContentSpan, markSpan}
-        let cellMarks = []; // 2D array for numerical marks (0 if no mark)
+        let cellMarks = []; // 2D array for numerical marks (null if no mark, then 0, 1, 2...)
         let gameIsOver = false;
         let probesMade = 0;
 
@@ -137,14 +136,15 @@
             gridCellReferences = [];
             cellMarks = []; 
             for (let r = 0; r < GRID_SIZE; r++) {
-                cellMarks[r] = Array(GRID_SIZE).fill(0);
+                // UPDATED: Initialize with null for no mark
+                cellMarks[r] = Array(GRID_SIZE).fill(null); 
             }
             gameIsOver = false;
             probesMade = 0;
             gameGridElement.innerHTML = ''; 
 
             createGrid();
-            placeFoxes();
+            placeFoxes(); // This will now place foxes in unique cells
             updateStatusDisplay();
             // For debugging:
             // console.log("Foxes placed at:", foxes.map(f => `(${f.row},${f.col}) ID:${f.id}`).join('; '));
@@ -173,16 +173,25 @@
 
                     cellTd.addEventListener('click', () => handleCellClick(r, c, cellRef));
                     cellTd.addEventListener('contextmenu', (event) => handleRightClick(event, r, c, cellRef));
-                    cellTd.addEventListener('auxclick', (event) => handleMiddleClick(event, r, c, cellRef));
+                    cellTd.addEventListener('auxclick', (event) => handleMiddleClick(event, r, c, cellRef)); // Middle click
                 }
             }
         }
 
+        // UPDATED: Ensures foxes are placed in unique cells
         function placeFoxes() {
+            const occupiedCells = new Set(); // Stores "row,col" strings to track occupied cells
+
             for (let i = 0; i < NUM_FOXES; i++) {
-                const row = Math.floor(Math.random() * GRID_SIZE);
-                const col = Math.floor(Math.random() * GRID_SIZE);
+                let row, col, cellKey;
+                do {
+                    row = Math.floor(Math.random() * GRID_SIZE);
+                    col = Math.floor(Math.random() * GRID_SIZE);
+                    cellKey = `${row},${col}`;
+                } while (occupiedCells.has(cellKey)); // Loop until an empty cell is found
+
                 foxes.push({ row, col, id: i, found: false });
+                occupiedCells.add(cellKey);
             }
         }
 
@@ -193,42 +202,59 @@
 
             probesMade++; 
 
-            let directHits = 0;
+            // Since foxes are in unique cells, directHits will be 0 or 1
+            let directHit = false;
             foxes.forEach(fox => {
                 if (fox.row === row && fox.col === col && !fox.found) {
                     fox.found = true;
                     foundFoxesCount++;
-                    directHits++;
+                    directHit = true;
                 }
             });
 
-            if (directHits > 0) {
-                cellRef.gameContent.textContent = FOX_ICON.repeat(directHits);
+            if (directHit) {
+                cellRef.gameContent.textContent = FOX_ICON; // Only one fox per cell possible now
                 cellRef.td.classList.add('found');
             } else {
                 const pelengCount = calculatePeleng(row, col);
                 cellRef.gameContent.textContent = pelengCount;
                 cellRef.td.classList.add('probed');
             }
+            
+            // Clear any user marks on probed/found cells
+            if (cellMarks[row][col] !== null) {
+                cellMarks[row][col] = null;
+                cellRef.mark.textContent = '';
+            }
 
             updateStatusDisplay();
             checkWin();
         }
 
+        // UPDATED: Right-click to mark, starts with '0'
         function handleRightClick(event, row, col, cellRef) {
             event.preventDefault(); 
-            if (gameIsOver) return;
+            if (gameIsOver || cellRef.td.classList.contains('probed') || cellRef.td.classList.contains('found')) {
+                return; // Don't mark probed or found cells
+            }
 
-            cellMarks[row][col]++;
+            if (cellMarks[row][col] === null) {
+                cellMarks[row][col] = 0; // First mark is '0'
+            } else {
+                cellMarks[row][col]++; // Increment existing mark
+            }
             cellRef.mark.textContent = cellMarks[row][col];
         }
 
+        // UPDATED: Middle-click to clear mark
         function handleMiddleClick(event, row, col, cellRef) {
-            if (event.button === 1) { 
+            if (event.button === 1) { // Middle mouse button
                 event.preventDefault();
-                if (gameIsOver) return;
+                if (gameIsOver || cellRef.td.classList.contains('probed') || cellRef.td.classList.contains('found')) {
+                    return; // Don't unmark probed or found cells
+                }
                 
-                cellMarks[row][col] = 0;
+                cellMarks[row][col] = null; // Reset mark to null (no mark)
                 cellRef.mark.textContent = ''; 
             }
         }
@@ -237,10 +263,8 @@
             const uniqueFoxIDsOnLines = new Set(); 
 
             foxes.forEach(fox => {
-                // **********************************************************************
-                // CHANGE HERE: The following line is REMOVED (or commented out)
-                // if (fox.found) return; // Previously, we skipped found foxes
-                // **********************************************************************
+                // The rule is that peleng counts all foxes (found or not)
+                // if (fox.found) return; // This line was correctly removed/commented in your provided code
 
                 const isOnRow = fox.row === probeRow;
                 const isOnCol = fox.col === probeCol;
@@ -257,6 +281,7 @@
         function updateStatusDisplay() {
             probesTextElement.textContent = `Probes: ${probesMade}`;
             if (gameIsOver) {
+                // Status text is set by checkWin when game ends
                 return;
             }
 
@@ -282,17 +307,19 @@
                         continue; 
                     }
 
-                    let foxesInCellCount = 0;
+                    // Since foxes are unique, at most one fox per cell
+                    let foxInCell = false;
                     foxes.forEach(fox => { 
-                        if (fox.row === r && fox.col === c) {
-                            foxesInCellCount++;
+                        if (fox.row === r && fox.col === c) { // No need to check !fox.found, reveal all
+                            foxInCell = true;
                         }
                     });
 
-                    if (foxesInCellCount > 0) { 
-                        cellRef.gameContent.textContent = FOX_ICON.repeat(foxesInCellCount);
-                        cellRef.td.classList.add('found'); 
-                        cellRef.td.style.backgroundColor = "#ffdddd"; 
+                    if (foxInCell) { 
+                        cellRef.gameContent.textContent = FOX_ICON;
+                        cellRef.td.classList.add('found'); // Visually mark as found
+                        // Optional: different style for revealed-at-end-not-by-player
+                        cellRef.td.style.backgroundColor = "#ffdddd"; // Light red for revealed
                     }
                 }
             }
